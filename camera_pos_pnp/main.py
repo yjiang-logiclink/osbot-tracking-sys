@@ -7,8 +7,7 @@ import cv2
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
 from camera_pose_optimizer import CameraPoseOptimizer, Camera
-# from device_client import DeviceClient   # 暂时不用
-
+from tcp_sender import TCPSender 
 
 # ---------------- UDP Listener ----------------
 def udp_listener(shared_dict, port=9000):
@@ -48,7 +47,7 @@ def compute_task(device_id, coord_f, coord_m, camera_f, camera_m):
 
 
 # ---------------- 主计算循环 ----------------
-def compute_and_print(shared_dict, camera_f, camera_ms):
+def compute_and_send(shared_dict, camera_f, camera_ms, tcp_sender):
     # device_client = DeviceClient("localhost", 12341)  # 暂时不用
 
     with ProcessPoolExecutor(max_workers=2) as executor:
@@ -96,6 +95,8 @@ def compute_and_print(shared_dict, camera_f, camera_ms):
 
                 print(line)
 
+                tcp_sender.send_message(1, res1["Optimized T"], res1["Euler Angles"])
+                tcp_sender.send_message(2, res2["Optimized T"], res2["Euler Angles"])
 
 # ---------------- Main ----------------
 def main():
@@ -133,15 +134,18 @@ def main():
     p = multiprocessing.Process(target=udp_listener, args=(shared_dict, 9000), daemon=True)
     p.start()
 
+    # ==== TCP Sender ====
+    tcp_sender = TCPSender("127.0.0.1", 12341)
+
     # ==== 主计算循环 ====
     try:
-        compute_and_print(shared_dict, camera_f, camera_ms)
+        compute_and_send(shared_dict, camera_f, camera_ms, tcp_sender)
     except KeyboardInterrupt:
         print("\n[INFO ] Shutting down...")
     finally:
+        tcp_sender.close()
         p.terminate()
         p.join()
-
 
 if __name__ == "__main__":
     main()
