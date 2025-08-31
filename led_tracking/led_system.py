@@ -3,11 +3,15 @@ import time
 from camera_source import CameraSource
 from led_controller import LedController
 from led_tracker import LedTracker
-import threading, queue
 import numpy as np
+from led_publisher import LedPublisher
+
 
 class LedTrackingSystem:
-    def __init__(self, udp_ip="0.0.0.0", udp_port=8000, show_windows=True, resize_scale=0.5):
+    def __init__(self, udp_ip="0.0.0.0", udp_port=8000,
+                 show_windows=True, resize_scale=0.5,
+                 publish_ip="127.0.0.1", publish_port=9000,
+                 debug=False):
         self.camera = CameraSource(udp_ip=udp_ip, udp_port=udp_port)
         self.is_arm = self.camera.is_arm
         self.show_windows = show_windows and (not self.is_arm)
@@ -35,6 +39,28 @@ class LedTrackingSystem:
         #         cv2.namedWindow(name)
 
         self.ctrl = LedController(username="cam", password="osbot", hostname="osbot-pi5-1")
+        self.publisher = LedPublisher(ip=publish_ip, port=publish_port)
+
+        self.debug = debug
+
+        self.state_desc = {
+            0:  "Init: all LEDs off, clear last_leds",
+            1:  "Turn on LED1 & LED3",
+            2:  "Wait 3 frames",
+            3:  "Cam1 & Cam2 update_leds [0]",
+            4:  "Turn on LED2 & LED4",
+            5:  "Wait 3 frames",
+            6:  "Cam1 & Cam2 update_leds [1]",
+            7:  "Turn on LED1 & LED5",
+            8:  "Wait 3 frames",
+            9:  "Cam1 update_leds [2], Cam3 [0]",
+            10: "Turn on LED2 & LED6",
+            11: "Wait 3 frames",
+            12: "Cam1 update_leds [3], Cam3 [1]",
+            13: "Turn on ALL LEDs",
+            14: "Wait 3 frames",
+            15: "Tracking mode: Cam1 [0,1,2,3], Cam2 [0,1], Cam3 [0,1]"
+        }
 
     def state_elapsed(self) -> bool:
         """检查当前状态是否已持续指定帧数"""
@@ -44,8 +70,9 @@ class LedTrackingSystem:
         self.state = new_state
         self.state_entry_frame = self.frame_counter
         self.retry_counter = 0
-        print(f"Enter state {new_state} at frame {self.frame_counter}")
-
+        desc = self.state_desc.get(new_state, "")
+        print(f"[STATE ] Frame {self.frame_counter:05d} | Enter state {new_state:2d} | {desc}")
+        
     def update_and_check(self, cam_name, frame, leds_to_track, check_loss=False):
         tracker = self.trackers[cam_name]["tracker"]
         leds, detected_flags = tracker.update_leds(frame, leds_to_track=leds_to_track)
@@ -179,10 +206,26 @@ class LedTrackingSystem:
                     ok2 = self.update_and_check("Cam_2", sub_imgs["Cam_2"], [0,1], check_loss=True)
                     ok3 = self.update_and_check("Cam_3", sub_imgs["Cam_3"], [0,1], check_loss=True)
 
-                    leds_cam1 = self.trackers["Cam_1"]["tracker"].last_leds
-                    print(f"Frame {self.frame_counter} | Cam_1 LEDs: {leds_cam1}")
+                    leds_cam1 = self.trackers["Cam_1"]["tracker"].last_leds  # 4 LEDs
+                    leds_cam2 = self.trackers["Cam_2"]["tracker"].last_leds[:2]  # 2 LEDs
+                    leds_cam3 = self.trackers["Cam_3"]["tracker"].last_leds[:2]  # 2 LEDs
 
+                    data = self.publisher.package(leds_cam1, leds_cam2, leds_cam3)
+                    self.publisher.send(data)
+
+                    if self.debug:
+                        cam1 = " ".join(f"({x:4d},{y:4d})" for x,y in leds_cam1)
+                        cam2 = " ".join(f"({x:4d},{y:4d})" for x,y in leds_cam2)
+                        cam3 = " ".join(f"({x:4d},{y:4d})" for x,y in leds_cam3)
+                        print(f"Frame {self.frame_counter:05d} | Cam_1: {cam1} | Cam_2: {cam2} | Cam_3: {cam3}")
+                        
                     if not (ok1 and ok2 and ok3):
+                        print(
+                            f"[WARN  ] Frame {self.frame_counter:05d} | LED lost!\n"
+                            f"         Cam1: {ok1}\n"
+                            f"         Cam2: {ok2}\n"
+                            f"         Cam3: {ok3}"
+                        )
                         self.set_state(0)
                         # 打开所有 tracker 的 tracking
                         for t in self.trackers.values():

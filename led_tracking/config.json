@@ -1,0 +1,8 @@
+{
+  "udp_port": 8000,
+  "show_windows": true,
+  "resize_scale": 0.33,
+  "publish_ip": "192.168.1.44",
+  "publish_port": 9000,
+  "debug": true
+}
