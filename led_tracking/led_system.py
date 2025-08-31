@@ -82,7 +82,7 @@ class LedTrackingSystem:
             for i in leds_to_track:
                 if not detected_flags[i]:
                     self.miss_counter[i] += 1
-                    if self.miss_counter[i] >= 3: 
+                    if self.miss_counter[i] >= 30: 
                         ok = False
                 else:
                     self.miss_counter[i] = 0
@@ -218,7 +218,7 @@ class LedTrackingSystem:
                         cam2 = " ".join(f"({x:4d},{y:4d})" for x,y in leds_cam2)
                         cam3 = " ".join(f"({x:4d},{y:4d})" for x,y in leds_cam3)
                         print(f"Frame {self.frame_counter:05d} | Cam_1: {cam1} | Cam_2: {cam2} | Cam_3: {cam3}")
-                        
+
                     if not (ok1 and ok2 and ok3):
                         print(
                             f"[WARN  ] Frame {self.frame_counter:05d} | LED lost!\n"

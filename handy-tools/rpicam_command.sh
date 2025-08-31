@@ -39,3 +39,11 @@ rpicam-vid -t 0 --inline   --mode 3840:2160:SRGGB10_CSI2P   --framerate 30 --wid
 
 rpicam-vid -t 0 --inline   --mode 4624:3472:SRGGB10_CSI2P   --framerate 20   --codec mjpeg  --width 4624 --height 3472 -o udp://192.168.0.118:8000 --shutter 10000
 rpicam-vid -t 0 --inline   --mode 4624:3472:SRGGB10_CSI2P   --framerate 20   --codec mjpeg  --width 4624 --height 3472 -o udp://192.168.0.118:8000 --shutter 10000
+
+
+
+rpicam-vid -t 0 --inline   --mode 3840:2160:SRGGB10_CSI2P   --framerate 30   --codec mjpeg  --width 3840 --height 2160 -o udp://192.168.1.44:8000 --shutter 500
+rpicam-vid -t 0 --inline   --mode 3840:2160:SRGGB10_CSI2P   --framerate 30   --codec mjpeg  --width 3840 --height 2160 -o udp://127.0.0.1:8000 --shutter 500
+
+
+sshpass -p 'osbot' rsync -av -e ssh ./ cam@osbot-pi5-1:~/osbot-tracker/osbot-tracking-sys/ --exclude '.*'
